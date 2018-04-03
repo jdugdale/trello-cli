@@ -5,124 +5,159 @@ fs = require("fs");
 var _ = require("underscore");
 
 var __ = function(
-  program,
-  output,
-  logger,
-  config,
-  trello,
-  translator,
-  trelloApiCommands
+    program,
+    output,
+    logger,
+    config,
+    trello,
+    translator,
+    trelloApiCommands
 ) {
-  var trelloApiCommand = {};
+    var trelloApiCommand = {};
 
-  trelloApiCommand.makeTrelloApiCall = function(options, onComplete) {
-    logger.info("Showing cards belonging to the specified list");
+    trelloApiCommand.makeTrelloApiCall = function(options, onComplete) {
+        logger.info("Showing cards belonging to the specified list");
 
-    // Grab our boards etc
-    try {
-      var boardId = translator.getBoardIdByName(options.board);
-    } catch (err) {
-      if (err.message == "Unknown Board") {
-        logger.warning("Unknown board.  Perhaps you have a typo?");
 
-        output.normal("\nYou have the following open boards:\n");
-        trelloApiCommands["show-boards"].makeTrelloApiCall(
-          {
-            includeClosed: false,
-            hideIds: true
-          },
-          null
-        );
-        return;
-      }
-    }
+        if (options.alias) {
+            var listId = translator.getListIdByAlias(options.alias);
+            trello.get(
+                "/1/lists/" + listId + "", {
+                    cards: "open"
+                },
+                function(err, data) {
+                    if (err) {
+                        throw err;
+                    }
 
-    var listIds = [];
+                    if (data.cards.length > 0) {
+                        if (options.showListName || !options.list) {
+                            output.underline(translator.getList(data.cards[0].idList));
+                        } else {
+                            output.underline(translator.getBoard(data.cards[0].idBoard));
+                        }
+                        translator.updateCardIds(options.alias, data.cards);
+                    }
+                    for (var i in data.cards) {
+                        var formattedCardName = data.cards[i].name.replace(/\n/g, "");
+                        if (!options.hideIds) {
+                            formattedCardName = `[${data.cards[i].alias}] ${formattedCardName}`;
+                        }
+                        output.normal("* " + formattedCardName);
+                    }
+                    output.normal("");
+                }
+            );
+        } else {
 
-    if (options.list) {
-      listIds.push(
-        translator.getListIdByBoardNameAndListName(options.board, options.list)
-      );
-    } else {
-      _.each(translator.cache.translations.lists, function(oneList, listId) {
-        if (listId != "undefined" && oneList["board"] == boardId) {
-          // oneList: [ boardId, listName ]
-          listIds.push(listId);
-        }
-      });
-    }
+            // Grab our boards etc
+            try {
+                var boardId = translator.getBoardIdByName(options.board);
+            } catch (err) {
+                if (err.message == "Unknown Board") {
+                    logger.warning("Unknown board.  Perhaps you have a typo?");
 
-    listIds.forEach(function(listId) {
-      trello.get(
-        "/1/lists/" + listId + "",
-        {
-          cards: "open"
-        },
-        function(err, data) {
-          if (err) {
-            throw err;
-          }
+                    output.normal("\nYou have the following open boards:\n");
+                    trelloApiCommands["show-boards"].makeTrelloApiCall({
+                            includeClosed: false,
+                            hideIds: true
+                        },
+                        null
+                    );
+                    return;
+                }
+            }
 
-          if (data.cards.length > 0) {
-            if (options.showListName || !options.list) {
-              output.underline(translator.getList(data.cards[0].idList));
+            var listIds = [];
+
+            if (options.list) {
+                listIds.push(
+                    translator.getListIdByBoardNameAndListName(options.board, options.list)
+                );
             } else {
-              output.underline(translator.getBoard(data.cards[0].idBoard));
+                _.each(translator.cache.translations.lists, function(oneList, listId) {
+                    if (listId != "undefined" && oneList["board"] == boardId) {
+                        // oneList: [ boardId, listName ]
+                        listIds.push(listId);
+                    }
+                });
             }
-          }
-          for (var i in data.cards) {
-            var formattedCardName = data.cards[i].name.replace(/\n/g, "");
-            if (!options.hideIds) {
-              formattedCardName =
-                data.cards[i].shortLink + " - " + formattedCardName;
-            }
-            output.normal("* " + formattedCardName);
-          }
-          output.normal("");
-        }
-      );
-    });
-  };
 
-  trelloApiCommand.nomnomProgramCall = function() {
-    program
-      .command("show-cards")
-      .help("Show the cards on a list")
-      .options({
-        board: {
-          abbr: "b",
-          metavar: "BOARD",
-          help: "The board name which contains the list of cards to show",
-          required: true
-        },
-        list: {
-          abbr: "l",
-          metavar: "LIST",
-          help: "The name of the list whose cards to show",
-          required: false
-        },
-        showListName: {
-          abbr: "n",
-          help:
-            "Show list name in title, in addtion to board name, if specific list specified",
-          required: false,
-          flag: true,
-          default: true
-        },
-        hideIds: {
-          abbr: "i",
-          help:
-            "Do not include the card IDs in the output (default is to print IDs)",
-          required: false,
-          flag: true,
-          default: false
-        }
-      })
-      .callback(function(options) {
-        trelloApiCommand.makeTrelloApiCall(options);
-      });
-  };
+            listIds.forEach(function(listId) {
+                trello.get(
+                    "/1/lists/" + listId + "", {
+                        cards: "open"
+                    },
+                    function(err, data) {
+                        if (err) {
+                            throw err;
+                        }
 
-  return trelloApiCommand;
+                        if (data.cards.length > 0) {
+                            if (options.showListName || !options.list) {
+                                output.underline(translator.getList(data.cards[0].idList));
+                            } else {
+                                output.underline(translator.getBoard(data.cards[0].idBoard));
+                            }
+                        }
+                        for (var i in data.cards) {
+                            var formattedCardName = data.cards[i].name.replace(/\n/g, "");
+                            if (!options.hideIds) {
+                                formattedCardName =
+                                    data.cards[i].shortLink + " - " + formattedCardName;
+                            }
+                            output.normal("* " + formattedCardName);
+                        }
+                        output.normal("");
+                    }
+                );
+            });
+        }
+    };
+
+    trelloApiCommand.nomnomProgramCall = function() {
+        program
+            .command("show-cards")
+            .help("Show the cards on a list")
+            .options({
+                board: {
+                    abbr: "b",
+                    metavar: "BOARD",
+                    help: "The board name which contains the list of cards to show",
+                    required: false
+                },
+                list: {
+                    abbr: "l",
+                    metavar: "LIST",
+                    help: "The name of the list whose cards to show",
+                    required: false
+                },
+                alias: {
+                    abbr: "a",
+                    metavar: "ALIAS",
+                    help: "Pre-configured alias of the list. Must supply either this option OR boardName, listName",
+                    required: false
+                },
+                showListName: {
+                    abbr: "n",
+                    help: "Show list name in title, in addtion to board name, if specific list specified",
+                    required: false,
+                    flag: true,
+                    default: true
+                },
+                hideIds: {
+                    abbr: "i",
+                    help: "Do not include the card IDs in the output (default is to print IDs)",
+                    required: false,
+                    flag: true,
+                    default: false
+                }
+            })
+            .callback(function(options) {
+                trelloApiCommand.makeTrelloApiCall(options);
+            });
+    };
+
+    return trelloApiCommand;
 };
 module.exports = __;

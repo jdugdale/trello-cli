@@ -26,6 +26,7 @@ var Translator = function(logger, config, trello) {
     cacheFile.translations.orgs = cacheFile.translations.orgs || {};
     cacheFile.translations.boards = cacheFile.translations.boards || {};
     cacheFile.translations.lists = cacheFile.translations.lists || {};
+    cacheFile.translations.cards = cacheFile.translations.cards || {};
     cacheFile.translations.users = cacheFile.translations.users || {};
     cacheFile.translations.me = cacheFile.translations.me || {};
 
@@ -55,6 +56,7 @@ Translator.prototype.reloadTranslations = function(type, onComplete) {
             orgs: {},
             boards: {},
             lists: {},
+            cards: {},
             users: {},
             me: {}
         };
@@ -66,6 +68,7 @@ Translator.prototype.reloadTranslations = function(type, onComplete) {
     cacheFile.translations.orgs = cacheFile.translations.orgs || {};
     cacheFile.translations.boards = cacheFile.translations.boards || {};
     cacheFile.translations.lists = cacheFile.translations.lists || {};
+    cacheFile.translations.cards = cacheFile.translations.cards || {};
     cacheFile.translations.users = cacheFile.translations.users || {};
     cacheFile.translations.me = cacheFile.translations.me || {};
 
@@ -346,6 +349,23 @@ Translator.prototype.getListIdByAlias = function(alias) {
 
     throw new Error("Unknown List");
 }
+
+Translator.prototype.updateCardIds = function(listAlias, cards) {
+    var cachedCards = this.cache.translations.cards;
+    cards.forEach(function(card) {
+        card.alias = listAlias + card.idShort;
+        cachedCards[card.alias] = {
+            id: card.id
+        };
+    });
+    var cachePath = this.config.get("configPath") + this.config.get("translationCache");
+    fs.writeFileSync(cachePath, JSON.stringify(this.cache));
+};
+
+Translator.prototype.getCardIdByShortId = function(shortId) {
+    var card = this.cache.translations.cards[shortId];
+    return card ? card.id : null;
+};
 
 Translator.prototype.getUserIdByDisplayName = function(name) {
     name = name.toLowerCase();
